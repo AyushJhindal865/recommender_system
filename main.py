@@ -4,18 +4,19 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import gdown  # <-- NEW: for downloading from Google Drive
+import gdown  # for downloading from Google Drive
 import os
 from sklearn.preprocessing import normalize
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
+import torch  # Ensure torch is imported
 import time
-
 
 # ------------------------------
 # Google Drive Download Helpers
 # ------------------------------
 
+@st.cache_resource
 def download_file_if_not_exists(url: str, local_path: str):
     """
     Download a file from Google Drive using gdown if it doesn't already exist locally.
@@ -25,14 +26,18 @@ def download_file_if_not_exists(url: str, local_path: str):
         local_path (str): The local path where the file should be saved.
     """
     if not os.path.exists(local_path):
-        gdown.download(url, local_path, quiet=False)
-    # If the file already exists, we do nothing and just load it.
-
+        try:
+            gdown.download(url, local_path, quiet=False)
+        except Exception as e:
+            st.error(f"Failed to download {local_path}: {e}")
+            st.stop()
+    return local_path
 
 # ------------------------------
 # Load Models and Data
 # ------------------------------
 
+@st.cache_resource
 def load_models():
     """
     Load the TF-IDF vectorizer (local), KNN model (Google Drive), combined features (Google Drive),
@@ -93,12 +98,10 @@ def load_models():
         st.error(f"Error loading models or data: {e}")
         return None, None, None, None, None
 
-
 tfidf, knn, combined_features, df, sentence_model = load_models()
 
 if tfidf is None or knn is None or combined_features is None or df is None or sentence_model is None:
     st.stop()  # Stop the app if any model/data failed to load
-
 
 # ------------------------------
 # Helper Functions
@@ -116,13 +119,11 @@ def extract_unique_terms(df, category):
                 terms.add(term)
     return sorted(list(terms))
 
-
 def preprocess_selection(selection):
     """
     Convert user input into the preprocessed feature name.
     """
     return selection.lower().replace(' ', '')
-
 
 def recommend_based_on_movies(selected_movies, df, combined_features, knn_model_low, top_n=10):
     """
@@ -162,7 +163,6 @@ def recommend_based_on_movies(selected_movies, df, combined_features, knn_model_
     final_recommendations = final_recommendations.head(top_n)
     return final_recommendations
 
-
 def recommend_based_on_text(user_description, sentence_model, combined_features, df, top_n=10):
     """
     Recommend movies based on user-provided textual description using Sentence Transformers.
@@ -195,7 +195,6 @@ def recommend_based_on_text(user_description, sentence_model, combined_features,
     final_recommendations = final_recommendations.head(top_n)
     return final_recommendations
 
-
 def display_recommendations(recommended_df):
     """
     Display recommended movies in the Streamlit app.
@@ -206,7 +205,6 @@ def display_recommendations(recommended_df):
             with st.expander("See overview"):
                 st.write(row['overview'])
         st.write("---")
-
 
 # ------------------------------
 # Extract Unique Terms for Dropdowns
