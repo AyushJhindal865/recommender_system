@@ -5,3 +5,4 @@ joblib
 scikit-learn
 sentence-transformers
 gdown
+torch==2.5.1
